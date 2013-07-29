@@ -1,3 +1,5 @@
+.*.sw?
+
 lib-cov
 *.seed
 *.log
