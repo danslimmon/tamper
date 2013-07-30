@@ -40,6 +40,39 @@ var Header = function(name, value) {
 };
 
 
+// An HTTP response.
+var Response = function() {
+    var data = '';
+
+    return {
+        // Adds data to the response.
+        addData: function(new_data) {
+            data += new_data;
+        },
+
+        fullData: function() {
+            return data;
+        }
+    }
+};
+
+
+// Applies filters to Response objects and sends them.
+var ResponseFilterSet = function() {
+    var response = null;
+    var socket = null;
+
+    return {
+        setResponse: function(new_response) { response = new_response; },
+        setSocket: function(new_socket) { socket = new_socket; },
+
+        // Sends the response on the given socket.
+        send: function() {
+            socket.write(response.fullData());
+        }
+    }
+}
+
 // Process command-line arguments.
 var argv = optimist
     .usage('Proxies requests and tampers with them in supposedly-acceptable ways.\n\nUSAGE: node server.js [--listen-host HOST] [--listen-port PORT] [--dest-host HOST] [--dest-port PORT]')
@@ -60,16 +93,24 @@ if (argv['help'] || argv['h']) {
 // Define web server
 var server = net.createServer(function (client_socket) {
     var server_socket = new net.Socket();
-    server_socket.connect(argv['dest-port'], argv['dest-host']);
+    var response = new Response();
 
+    server_socket.connect(argv['dest-port'], argv['dest-host']);
     client_socket.on('data', function(data) {
         server_socket.write(data);
     });
-    client_socket.on('end', function(){console.log('ended data');});
-    server_socket.on('data', function(data) {
-        client_socket.write(data);
+    client_socket.on('end', function(){
+        server_socket.end();
     });
-    server_socket.on('end', function(){client_socket.end();});
+    server_socket.on('data', function(data) {
+        response.addData(data);
+    });
+    server_socket.on('end', function(){
+        var response_filterset = new ResponseFilterSet();
+        response_filterset.setResponse(response);
+        response_filterset.setSocket(client_socket);
+        response_filterset.send();
+    });
 });
 
 // Start listening
