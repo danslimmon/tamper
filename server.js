@@ -8,9 +8,10 @@ var LISTEN_PORT = 4080;
 
 
 // An HTTP header (either request or response)
-var Header = function(name, value) {
-    var name = name;
-    var value = value;
+var Header = function(header_str) {
+    var parts = header_str.split(': ', 2);
+    var name = parts[0];
+    var value = parts[1];
 
     return {
         // Normalizes the header's name.
@@ -43,11 +44,35 @@ var Header = function(name, value) {
 // An HTTP response.
 var Response = function() {
     var data = '';
+    var status_line = null;
+    var headers = null;
+    var body = null;
+
+    // Parses the response data into headers and body
+    var parseData = function() {
+        // Break apart headers from body
+        var parts = data.split('\r\n\r\n', 1);
+        var headers_str = parts[0];
+        body = parts[1];
+
+        // Parse headers
+        var header_lines = headers_str.split('\r\n');
+        status_line = header_lines.shift();
+        headers = header_lines.map(function(h_str) {
+            return Header(h_str);
+        });
+    }
 
     return {
         // Adds data to the response.
         addData: function(new_data) {
             data += new_data;
+        },
+
+        // Returns an array of Header objects representing the response headers.
+        getHeaders: function() {
+            if (! headers) { parseData(); }
+            return headers;
         },
 
         fullData: function() {
@@ -91,7 +116,7 @@ if (argv['help'] || argv['h']) {
 }
 
 // Define web server
-var server = net.createServer(function (client_socket) {
+var server = net.createServer(function(client_socket) {
     var server_socket = new net.Socket();
     var response = new Response();
 
