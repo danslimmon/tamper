@@ -3,8 +3,12 @@ var net = require('net');
 
 var optimist = require('optimist');
 
-var LISTEN_HOST = '*';  // Bind to all available addresses
-var LISTEN_PORT = 4080;
+//+ Jonas Raoni Soares Silva
+////@ http://jsfromhell.com/array/shuffle [v1.0]
+function shuffle(o) {
+    for(var j, x, i = o.length; i; j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
+        return o;
+};
 
 
 // An HTTP header (either request or response)
@@ -51,7 +55,7 @@ var Response = function() {
     // Parses the response data into headers and body
     var parseData = function() {
         // Break apart headers from body
-        var parts = data.split('\r\n\r\n', 1);
+        var parts = data.split('\r\n\r\n', 2);
         var headers_str = parts[0];
         body = parts[1];
 
@@ -75,11 +79,43 @@ var Response = function() {
             return headers;
         },
 
+        // Sets the response headers to the given array of Header objects
+        setHeaders: function(new_headers) {
+            headers = new_headers;
+        },
+
+        // Returns the whole contents of the response that should be sent over the socket.
         fullData: function() {
-            return data;
+            resp_data = status_line + '\r\n';
+            resp_data += headers.map(function(hdr) {
+                return hdr.protocolString();
+            }).join('\r\n');
+            resp_data += '\r\n\r\n' + body;
+            console.log('%j', resp_data);
+            return resp_data;
         }
     }
 };
+
+
+// Filter that randomizes the order of the response headers
+var FilterRespShuffleHeaders = function() {
+    return {
+        // Applies this filter to the given Response instance.
+        applyFilter: function(response) {
+            var headers = response.getHeaders();
+            var new_headers = headers.slice(0);
+
+            // Shuffle `new_headers` until it's different
+            while (headers.reduce(function(s, h) {return s + h.normalizedName();}, '') ==
+                   new_headers.reduce(function(s, h) {return s + h.normalizedName();}, '')) {
+                new_headers = shuffle(new_headers);
+            }
+
+            response.setHeaders(new_headers);
+        }
+    }
+}
 
 
 // Applies filters to Response objects and sends them.
@@ -93,7 +129,9 @@ var ResponseFilterSet = function() {
 
         // Sends the response on the given socket.
         send: function() {
-            socket.write(response.fullData());
+            var filt = FilterRespShuffleHeaders();
+            filt.applyFilter(response);
+            socket.end(response.fullData());
         }
     }
 }
