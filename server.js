@@ -1,6 +1,8 @@
 var util = require('util');
 var net = require('net');
 
+var optimist = require('optimist');
+
 var LISTEN_HOST = '*';  // Bind to all available addresses
 var LISTEN_PORT = 4080;
 
@@ -38,6 +40,24 @@ var Header = function(name, value) {
 };
 
 
+// Process command-line arguments.
+var argv = optimist
+    .usage('Proxies requests and tampers with them in supposedly-acceptable ways.\n\nUSAGE: node server.js [--listen-host HOST] [--listen-port PORT] [--dest-host HOST] [--dest-port PORT]')
+    .describe('listen-host', 'Listen on the host HOST')
+    .describe('listen-port', 'Listen on the port PORT')
+    .describe('dest-host', 'Proxy to the host HOST')
+    .describe('dest-port', 'Proxy to the port PORT')
+    .default('listen-host', '*')
+    .default('listen-port', 4080)
+    .default('dest-host', 'localhost')
+    .default('dest-port', 80)
+    .argv;
+if (argv['help'] || argv['h']) {
+    optimist.showHelp();
+    process.exit();
+}
+
+// Define web server
 var server = net.createServer(function (socket) {
     var response_headers = [];
 
@@ -52,10 +72,11 @@ var server = net.createServer(function (socket) {
     socket.end();
 });
 
-if (LISTEN_HOST == '*') {
-    server.listen(LISTEN_PORT);
+// Start listening
+if (argv['listen-host'] == '*') {
+    server.listen(argv['listen-port']);
 } else {
-    server.listen(LISTEN_PORT, LISTEN_HOST);
+    server.listen(argv['listen-port'], argv['listen-host']);
 }
 
-console.log(util.format('Server running at http://%s:%d/', LISTEN_HOST, LISTEN_PORT));
+console.log(util.format('Server running at http://%s:%d/', argv['listen-host'], argv['listen-port']));
