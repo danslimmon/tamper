@@ -58,18 +58,18 @@ if (argv['help'] || argv['h']) {
 }
 
 // Define web server
-var server = net.createServer(function (socket) {
-    var response_headers = [];
+var server = net.createServer(function (client_socket) {
+    var server_socket = new net.Socket();
+    server_socket.connect(argv['dest-port'], argv['dest-host']);
 
-    response_headers.push(new Header('Date', 'Tue, 30 Jul 2013 02:41:02 GMT'));
-    response_headers.push(new Header('Content-Type', 'text/html; charset=UTF-8'));
-    response_headers.push(new Header('Connection', 'close'));
-
-    socket.write('HTTP/1.1 200 OK\n');
-    response_headers.forEach(function(element, index, array) {
-        socket.write(element.protocolString() + '\n');
+    client_socket.on('data', function(data) {
+        server_socket.write(data);
     });
-    socket.end();
+    client_socket.on('end', function(){console.log('ended data');});
+    server_socket.on('data', function(data) {
+        client_socket.write(data);
+    });
+    server_socket.on('end', function(){client_socket.end();});
 });
 
 // Start listening
