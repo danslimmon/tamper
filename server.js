@@ -46,10 +46,9 @@ var server = net.createServer(function (socket) {
     response_headers.push(new Header('Connection', 'close'));
 
     socket.write('HTTP/1.1 200 OK\n');
-    for (hdr_idx in response_headers) {
-        hdr = response_headers[hdr_idx];
-        socket.write(hdr.protocolString() + '\n');
-    }
+    response_headers.forEach(function(element, index, array) {
+        socket.write(element.protocolString() + '\n');
+    });
     socket.end();
 });
 
