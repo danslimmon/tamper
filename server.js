@@ -125,7 +125,25 @@ ResponseBuffer.prototype.add_chunk = function(chunk) {
 
 // Writes the response data to the ClientResponse object.
 ResponseBuffer.prototype.write = function(response) {
-    response.write(chunk);
+    var resp_socket = response.socket;
+
+    // Write status line
+    var status_line = "HTTP/" + this.proxy_response.httpVersion +
+        " " + this.proxy_response.statusCode.toString() +
+        " " + http.STATUS_CODES[this.proxy_response.statusCode];
+    resp_socket.write(status_line + "\n");
+
+    // Write headers
+    var header_blob = "";
+    for (var header_ind in this.headers) {
+        header_blob += this.headers[header_ind][0] + ": " + this.headers[header_ind][1] + "\n";
+    }
+    resp_socket.write(header_blob + "\n");
+
+    // Write body
+    for (var chunk_ind in this.chunks) {
+        resp_socket.write(this.chunks[chunk_ind]);
+    }
 }
 
 
@@ -149,9 +167,8 @@ function startListening(port, host) {
                 }
 
                 response_buffer.write(response);
-                response.end();
+                response.socket.end();
             });
-            response.writeHead(proxy_response.statusCode, proxy_response.headers);
         });
 
         request.on('data', function(chunk) {
