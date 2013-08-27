@@ -12,22 +12,11 @@ function shuffle(o) {
 
 
 // Filter that randomizes the order of the response headers
-var FilterRespShuffleHeaders = function() {
-    return {
-        // Applies this filter to the given Response instance.
-        applyFilter: function(response) {
-            var headers = response.getHeaders();
-            var new_headers = headers.slice(0);
-
-            // Shuffle `new_headers` until it's different
-            while (headers.reduce(function(s, h) {return s + h.normalizedName();}, '') ==
-                   new_headers.reduce(function(s, h) {return s + h.normalizedName();}, '')) {
-                new_headers = shuffle(new_headers);
-            }
-
-            response.setHeaders(new_headers);
-        }
-    }
+function FilterRespShuffleHeaders() {
+}
+// Applies this filter to the given ResponseBuffer instance.
+FilterRespShuffleHeaders.prototype.applyFilter = function(response_buffer) {
+    response_buffer.headers = shuffle(response_buffer.headers);
 }
 
 
@@ -45,7 +34,7 @@ var ResponseFilterPicker = function(numToPick, retainOrder) {
     this.numToPick = typeof(numToPick) !== 'undefined' ? numToPick : 3;
     this.retainOrder = typeof(retainOrder) !== 'undefined' ? retainOrder : false;
 
-    this.availFilters = [FilterRespShuffleHeaders];
+    this.availFilters = [new FilterRespShuffleHeaders()];
 }
 
 // Determines which response filters are allowed by the given request.
@@ -66,7 +55,7 @@ var ResponseFilterPicker = function(numToPick, retainOrder) {
 // If 'allow' and 'disallow' are both provided, only 'allow' will be used.
 ResponseFilterPicker.prototype._filtersAllowedByRequest = function(req) {
     if (! ('tamper-resp-filters' in req.headers)) { return this.availFilters.slice(0) }
-    
+
     var headerObj = JSON.parse(req.headers('tamper-resp-filters'));
     if ('allow' in headerObj) {
         return this.availFilters.filter(function(filt) {
@@ -95,7 +84,7 @@ ResponseFilterPicker.prototype.pick = function(req, res) {
     var possibleFilters = this._filtersAllowed(req, res);
 
     if (! this.retainOrder) {
-        possibleFilters = possibleFilters.shuffle();
+        possibleFilters = shuffle(possibleFilters);
     }
     return possibleFilters.slice(0, this.numToPick);
 }
@@ -119,12 +108,59 @@ if (argv['help'] || argv['h']) {
 }
 
 
+// Staging area for what we're going to send back to the client.
+function ResponseBuffer(proxy_response) {
+    this.proxy_response = proxy_response;
+    this.chunks = [];
+    this.headers = [];
+}
+
+// Adds a chunk to be sent back to the client in the response
+ResponseBuffer.prototype.add_chunk = function(chunk) {
+    this.chunks.push(chunk);
+    for (var header_name in this.proxy_response.headers) {
+        this.headers.push([header_name, this.proxy_response.headers[header_name]]);
+    }
+}
+
+// Writes the response data to the ClientResponse object.
+ResponseBuffer.prototype.write = function(response) {
+    response.write(chunk);
+}
+
+
 function startListening(port, host) {
     httpServer = new http.Server();
     httpServer.listen(port, host);
-    httpServer.on('request', function(req, res) {
-        console.log(req);
-        console.log(res);
+    httpServer.on('request', function(request, response) {
+        var proxy_request = http.request({hostname: 'localhost', port: 8000});
+
+        proxy_request.on('response', function (proxy_response) {
+            var response_buffer = new ResponseBuffer(proxy_response);
+
+            proxy_response.on('data', function(chunk) {
+                response_buffer.add_chunk(chunk, 'binary');
+            });
+            proxy_response.addListener('end', function() {
+                var rfp = new ResponseFilterPicker();
+                var filters = rfp.pick(request, proxy_response);
+                for (filt_index in filters) {
+                    filters[filt_index].applyFilter(response_buffer)
+                }
+
+                response_buffer.write(response);
+                response.end();
+            });
+            response.writeHead(proxy_response.statusCode, proxy_response.headers);
+        });
+
+        request.on('data', function(chunk) {
+            proxy_request.write(chunk, 'binary');
+        });
+        request.on('end', function() {
+            proxy_request.end();
+        });
+
     });
 }
 
