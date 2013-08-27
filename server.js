@@ -13,6 +13,7 @@ function shuffle(o) {
 
 // Filter that randomizes the order of the response headers
 function FilterRespShuffleHeaders() {
+    this.name = 'ShuffleHeaderOrder';
 }
 // Applies this filter to the given ResponseBuffer instance.
 FilterRespShuffleHeaders.prototype.applyFilter = function(response_buffer) {
@@ -56,18 +57,20 @@ var ResponseFilterPicker = function(numToPick, retainOrder) {
 ResponseFilterPicker.prototype._filtersAllowedByRequest = function(req) {
     if (! ('tamper-resp-filters' in req.headers)) { return this.availFilters.slice(0) }
 
-    var headerObj = JSON.parse(req.headers('tamper-resp-filters'));
+    var headerObj = JSON.parse(req.headers['tamper-resp-filters']);
     if ('allow' in headerObj) {
         return this.availFilters.filter(function(filt) {
-            return (filt.name in headerObj.allow);
+            return (headerObj.allow.indexOf(filt.name) != -1);
         })
     } else if ('disallow' in headerObj) {
         return this.availFilters.filter(function(filt) {
-            return (! (filt.name in headerObj.disallow));
+            return (! (headerObj.disallow.indexOf(filt.name) != -1));
         })
     }
 
-    throw "Got `Tamper-Resp-Filters` header, but it specifies neither 'allow' nor 'disallow'";
+    // Got `Tamper-Resp-Filters` header, but it specifies neither 'allow' nor 'disallow'.
+    // Disallow all.
+    return [];
 }
 
 // Determines the list of filters allowed by the given request and response.
