@@ -121,9 +121,6 @@ function ResponseBuffer(proxy_response) {
 // Adds a chunk to be sent back to the client in the response
 ResponseBuffer.prototype.add_chunk = function(chunk) {
     this.chunks.push(chunk);
-    for (var header_name in this.proxy_response.headers) {
-        this.headers.push([header_name, this.proxy_response.headers[header_name]]);
-    }
 }
 
 // Writes the response data to the ClientResponse object.
@@ -150,15 +147,13 @@ ResponseBuffer.prototype.write = function(response) {
 }
 
 // Changes the response header names' case to that sent by the target server.
-ResponseBuffer.prototype.recaseHeaders = function(proxy_response) {
-    // Yes yes, this is a private variable. But shit's got to get done.
-    for (var header_ind in this.headers) {
-        var header_name = this.headers[header_ind][0];
-        var sent_header_blob = proxy_response.req._header;
-        var match = sent_header_blob.match(new RegExp("\r\n(" + header_name + ")", "i"));
-        if (match !== null) {
-            this.headers[header_ind][0] = match[1];
-        }
+//
+// @param parser - An http.HTTPParser instance with headers populated already
+ResponseBuffer.prototype.populateHeaders = function(parser) {
+    // parser.headers is a list of alternating header names and header values.
+    console.log(parser);
+    for (var i = 0; i < parser.headers.length; i += 2) {
+        this.headers.push([parser.headers[i], parser.headers[i+1]]);
     }
 }
 
@@ -169,25 +164,27 @@ function startListening(port, host) {
     httpServer.listen(port, host);
     httpServer.on('request', function(request, response) {
         var proxy_request = http.request({hostname: 'localhost', port: 8000});
+        var response_buffer = new ResponseBuffer();
 
         proxy_request.on('socket', function(socket) {
             // This is how we get at the header names with their original case
-            // before the HTTP parser lowercases them.
+            // and order before the HTTP parser lowercases and disorders them.
             var old_onHeadersComplete = proxy_request.parser.onHeadersComplete;
-            proxy_request.parser.onHeadersComplete = function(){console.log(arguments),old_onHeadersComplete.apply(proxy_request.parser,arguments);};
+
+            proxy_request.parser.onHeadersComplete = function(parser) {
+                response_buffer.populateHeaders(parser);
+                old_onHeadersComplete.apply(proxy_request.parser, arguments);
+            };
         });
 
         proxy_request.on('response', function (proxy_response) {
-            var response_buffer = new ResponseBuffer(proxy_response);
+            response_buffer.proxy_response = proxy_response
 
             proxy_response.on('data', function(chunk) {
                 response_buffer.add_chunk(chunk, 'binary');
             });
-            proxy_response.addListener('end', function() {
-                // First thing to do is put the header names in the case
-                // originally passed by the server.
-                response_buffer.recaseHeaders(proxy_response);
 
+            proxy_response.addListener('end', function() {
                 var rfp = new ResponseFilterPicker();
                 var filters = rfp.pick(request, proxy_response);
                 for (filt_index in filters) {
