@@ -151,7 +151,6 @@ ResponseBuffer.prototype.write = function(response) {
 // @param parser - An http.HTTPParser instance with headers populated already
 ResponseBuffer.prototype.populateHeaders = function(parser) {
     // parser.headers is a list of alternating header names and header values.
-    console.log(parser);
     for (var i = 0; i < parser.headers.length; i += 2) {
         this.headers.push([parser.headers[i], parser.headers[i+1]]);
     }
@@ -169,11 +168,13 @@ function startListening(port, host) {
         proxy_request.on('socket', function(socket) {
             // This is how we get at the header names with their original case
             // and order before the HTTP parser lowercases and disorders them.
-            var old_onHeadersComplete = proxy_request.parser.onHeadersComplete;
 
-            proxy_request.parser.onHeadersComplete = function(parser) {
-                response_buffer.populateHeaders(parser);
-                old_onHeadersComplete.apply(proxy_request.parser, arguments);
+            var old_onHeadersComplete = proxy_request.parser.onHeadersComplete;
+            proxy_request.parser.onHeadersComplete = function(info) {
+                response_buffer.populateHeaders(info);
+                if (old_onHeadersComplete !== undefined) {
+                    return old_onHeadersComplete.apply(this, arguments);
+                }
             };
         });
 
