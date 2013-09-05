@@ -31,4 +31,49 @@ These filters can be applied to the response before returning it to the client.
 ShuffleHeaderOrder
 ----
 
-Randomly rearranges the order of the headers returned by the server.
+Randomizes the order of response headers.
+
+Pristine response:
+
+    HTTP/1.0 200 OK
+    Server: SimpleHTTP/0.6 Python/2.7.2
+    Date: Thu, 05 Sep 2013 22:08:41 GMT
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 3
+
+    foo
+
+Proxied response:
+
+    HTTP/1.0 200 OK
+    Content-Type: text/html; charset=utf-8
+    Server: SimpleHTTP/0.6 Python/2.7.2
+    Content-Length: 3
+    Date: Thu, 05 Sep 2013 22:08:41 GMT
+
+    foo
+
+RandomizeHeaderCase
+----
+
+Randomizes the case of header names.
+
+Pristine response:
+
+    HTTP/1.0 200 OK
+    Server: SimpleHTTP/0.6 Python/2.7.2
+    Date: Thu, 05 Sep 2013 22:08:41 GMT
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 3
+
+    foo
+
+Proxied response:
+
+    HTTP/1.0 200 OK
+    sErVer: SimpleHTTP/0.6 Python/2.7.2
+    dATE: Thu, 05 Sep 2013 22:08:41 GMT
+    CoNtenT-tYpe: text/html; charset=utf-8
+    cOnTENt-lEnGTH: 178
+
+    foo

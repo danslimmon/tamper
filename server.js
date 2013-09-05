@@ -7,8 +7,14 @@ var optimist = require('optimist');
 // Shuffles an array
 function shuffle(o) {
     for(var j, x, i = o.length; i; j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
-        return o;
+    return o;
 };
+
+function randomizeCase(s) {
+    return s.split('').map(function(c) {
+        return Math.floor(Math.random()*2) ? c.toUpperCase() : c.toLowerCase();
+    }).join('');
+}
 
 
 // Filter that randomizes the order of the response headers
@@ -18,6 +24,18 @@ function FilterRespShuffleHeaders() {
 // Applies this filter to the given ResponseBuffer instance.
 FilterRespShuffleHeaders.prototype.apply_filter = function(response_buffer) {
     response_buffer.headers = shuffle(response_buffer.headers);
+}
+
+
+// Filter that randomizes the case of the response header names
+function FilterRespRandomizeHeaderCase() {
+    this.name = 'RandomizeHeaderCase';
+}
+// Applies this filter to the given ResponseBuffer instance.
+FilterRespRandomizeHeaderCase.prototype.apply_filter = function(response_buffer) {
+    response_buffer.headers = response_buffer.headers.map(function(h) {
+        return [randomizeCase(h[0]), h[1]];
+    });
 }
 
 
@@ -35,7 +53,10 @@ var ResponseFilterPicker = function(numToPick, retainOrder) {
     this.numToPick = typeof(numToPick) !== 'undefined' ? numToPick : 3;
     this.retainOrder = typeof(retainOrder) !== 'undefined' ? retainOrder : false;
 
-    this.availFilters = [new FilterRespShuffleHeaders()];
+    this.availFilters = [
+          new FilterRespShuffleHeaders()
+        , new FilterRespRandomizeHeaderCase()
+    ];
 }
 
 // Determines which response filters are allowed by the given request.
@@ -168,7 +189,6 @@ function startListening(port, host) {
         proxy_request.on('socket', function(socket) {
             // This is how we get at the header names with their original case
             // and order before the HTTP parser lowercases and disorders them.
-
             var old_onHeadersComplete = proxy_request.parser.onHeadersComplete;
             proxy_request.parser.onHeadersComplete = function(info) {
                 response_buffer.populateHeaders(info);
