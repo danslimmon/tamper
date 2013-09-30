@@ -152,19 +152,20 @@ ResponseBuffer.prototype.write = function(response) {
     var status_line = "HTTP/" + this.proxy_response.httpVersion +
         " " + this.proxy_response.statusCode.toString() +
         " " + http.STATUS_CODES[this.proxy_response.statusCode];
-    resp_socket.write(status_line + "\n");
 
     // Write headers
     var header_blob = "";
     for (var header_ind in this.headers) {
         header_blob += this.headers[header_ind][0] + ": " + this.headers[header_ind][1] + "\n";
     }
-    resp_socket.write(header_blob + "\n");
 
     // Write body
+    var body = ''
     for (var chunk_ind in this.chunks) {
-        resp_socket.write(this.chunks[chunk_ind]);
+	body += this.chunks[chunk_ind]
     }
+
+    resp_socket.write([status_line, header_blob, body].join("\n"));
 }
 
 // Changes the response header names' case to that sent by the target server.
