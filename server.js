@@ -183,8 +183,13 @@ function startListening(port, host) {
     var httpServer = new http.Server();
     httpServer.listen(port, host);
     httpServer.on('request', function(request, response) {
-        var proxy_request = http.request({hostname: 'localhost', port: 8000});
         var response_buffer = new ResponseBuffer();
+        var proxy_request = http.request({hostname: argv['dest-host'],
+                                          port: argv['dest-port'],
+                                          method: request.method,
+                                          path: request.url,
+                                          headers: request.headers,
+                                         });
 
         proxy_request.on('socket', function(socket) {
             // This is how we get at the header names with their original case
@@ -199,7 +204,7 @@ function startListening(port, host) {
         });
 
         proxy_request.on('response', function (proxy_response) {
-            response_buffer.proxy_response = proxy_response
+            response_buffer.proxy_response = proxy_response;
 
             proxy_response.on('data', function(chunk) {
                 response_buffer.add_chunk(chunk, 'binary');
